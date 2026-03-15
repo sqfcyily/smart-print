@@ -1,0 +1,97 @@
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
+param(
+  [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+  [Alias('FullName')]
+  [string[]] $Path,
+
+  [Parameter()]
+  [Alias('Printer')]
+  [string] $PrinterName,
+
+  [Parameter()]
+  [ValidateRange(1, 100)]
+  [int] $Copies = 1,
+
+  [Parameter()]
+  [switch] $Wait,
+
+  [Parameter()]
+  [ValidateRange(1, 3600)]
+  [int] $TimeoutSeconds = 120
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+if ($PSVersionTable.PSEdition -ne 'Desktop' -and $PSVersionTable.Platform -ne 'Win32NT') {
+  throw "This script is intended to run on Windows."
+}
+
+function Resolve-PrintPaths {
+  param([Parameter(Mandatory = $true)][string]$InputPath)
+
+  if (Test-Path -LiteralPath $InputPath -PathType Container) {
+    throw "Path is a directory: $InputPath"
+  }
+
+  if (Test-Path -LiteralPath $InputPath -PathType Leaf) {
+    return ,(Resolve-Path -LiteralPath $InputPath).Path
+  }
+
+  $items = Get-ChildItem -Path $InputPath -File -ErrorAction SilentlyContinue
+  if ($items) {
+    return $items | Select-Object -ExpandProperty FullName
+  }
+
+  return @()
+}
+
+$files = New-Object System.Collections.Generic.List[string]
+foreach ($p in $Path) {
+  if ([string]::IsNullOrWhiteSpace($p)) { continue }
+  foreach ($f in (Resolve-PrintPaths -InputPath $p)) { $files.Add($f) }
+}
+
+if ($files.Count -eq 0) {
+  throw "No files found for Path: $($Path -join ', ')"
+}
+
+$verb = if ($PrinterName) { 'PrintTo' } else { 'Print' }
+$printerArg = $null
+if ($PrinterName) {
+  $printerArg = '"' + $PrinterName.Replace('"', '""') + '"'
+}
+
+foreach ($file in $files) {
+  for ($copyIndex = 1; $copyIndex -le $Copies; $copyIndex++) {
+    $target = if ($PrinterName) { "$file -> $PrinterName" } else { "$file -> (default printer)" }
+    $action = if ($Copies -gt 1) { "Print (copy $copyIndex of $Copies)" } else { 'Print' }
+    if (-not $PSCmdlet.ShouldProcess($target, $action)) { continue }
+
+    try {
+      $startParams = @{
+        FilePath    = $file
+        Verb        = $verb
+        ErrorAction = 'Stop'
+        PassThru    = $true
+      }
+      if ($PrinterName) { $startParams.ArgumentList = @($printerArg) }
+
+      $proc = Start-Process @startParams
+
+      if ($Wait -and $proc) {
+        $exited = $proc.WaitForExit($TimeoutSeconds * 1000)
+        if (-not $exited) {
+          Write-Warning "Print process did not exit within $TimeoutSeconds seconds (PID $($proc.Id)). The print job may still have been queued."
+        }
+      }
+    } catch {
+      if ($PrinterName) {
+        Write-Warning "PrintTo failed for '$file' with printer '$PrinterName'. Falling back to default printer (Verb=Print)."
+        Start-Process -FilePath $file -Verb Print -ErrorAction Stop | Out-Null
+      } else {
+        throw
+      }
+    }
+  }
+}

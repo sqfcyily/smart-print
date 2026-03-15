@@ -1,0 +1,17 @@
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+# Prefer Get-Printer (Windows 8+/Server 2012+). Fall back to WMI if unavailable.
+if (Get-Command Get-Printer -ErrorAction SilentlyContinue) {
+  Get-Printer |
+    Select-Object Name, DriverName, PortName, Shared, Published, Default |
+    Sort-Object -Property @{ Expression = 'Default'; Descending = $true }, Name
+  exit 0
+}
+
+Get-CimInstance -ClassName Win32_Printer |
+  Select-Object Name, DriverName, PortName, Shared, Default |
+  Sort-Object -Property @{ Expression = 'Default'; Descending = $true }, Name
