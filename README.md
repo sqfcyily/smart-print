@@ -16,26 +16,39 @@ Typical use case: a user sends a file in chat apps such as **Feishu/Lark** or **
 
 It uses Windows shell printing verbs (`Print` / `PrintTo`) and supports selecting a printer, multiple copies, and optionally waiting for the spawned print process.
 
-### Prerequisites (required)
+### System Requirements
 
-- **Windows** environment.
-- The user has already **connected/installed a printer**, and Windows can see it.
-- The file types to print (PDF/DOCX/PNG/…) have a working **Windows file association** that supports printing (printing relies on the associated application).
+| Item       | Requirement                                   |
+| ---------- | --------------------------------------------- |
+| OS         | Windows 8+/Windows Server 2012+ (recommended) |
+| PowerShell | PowerShell 5.1+ (Desktop or Core)             |
+| Printer    | Installed and configured driver               |
 
 ### Safety / confirmation rules (important)
 
 This skill is designed to never print unless the user explicitly asks to print.
 
-1. No auto-print on file arrival.
-2. Confirm per file / per batch.
-3. Require an explicit print instruction and a clear target (which attachment(s) to print).
+1. **No Auto-Print**: Only execute printing when the user explicitly requests it.
 
-### ClawHub / text-only packaging note
+2. **Clear Instructions**: Must satisfy both:
 
-Some upload validators treat `.ps1` as “non-text”. To keep this skill publishable as text-only:
+   - Clear print instruction (e.g., "print" / "打印")
+   - Clear print target (which files to print)
 
-- The PowerShell scripts are stored as `.ps1.txt` under `scripts/`.
-- The runner should execute them by loading the text and invoking it as a `ScriptBlock` (see `SKILL.md`).
+3. **No Inference**: File names or document content containing "print" will not trigger printing.
+
+###  File Type Support
+
+| File Type | Supported | Required Application                      |
+| --------- | --------- | ----------------------------------------- |
+| PDF       | ✅         | Adobe Acrobat Reader / Foxit Reader / WPS |
+| DOCX      | ✅         | Microsoft Word / WPS / LibreOffice        |
+| PNG/JPG   | ✅         | Windows Photo Viewer / IrfanView          |
+| TXT       | ✅         | Notepad / Notepad++                       |
+| XLSX      | ✅         | Microsoft Excel / WPS                     |
+| PPTX      | ✅         | Microsoft PowerPoint / WPS                |
+
+   **Note**: If a file type cannot be printed, manually open the file and print once to confirm the associated application supports printing.
 
 ### Sample
 
@@ -61,26 +74,38 @@ Some upload validators treat `.ps1` as “non-text”. To keep this skill publis
 
 它通过 PowerShell 调用 Windows 的外壳打印动词（`Print` / `PrintTo`）发起打印，支持指定打印机、份数，以及可选等待打印进程退出。
 
-### 前置条件（必须）
+### 系统要求
 
-- 运行环境为 **Windows**。
-- 用户已提前 **连接/安装好打印机**，并且 Windows 能识别到。
-- 需要打印的文件类型（PDF/DOCX/PNG/…）在 Windows 中已配置好正确的**默认打开程序/文件关联**，且该程序支持打印（打印依赖关联应用）。
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | Windows 8+/Windows Server 2012+ (推荐) |
+| PowerShell | PowerShell 5.1+ (Desktop 或 Core) |
+| 打印机 | 已安装并配置好驱动 |
 
 ### 安全/确认规则（很重要）
 
 本技能的设计目标是：只有在用户明确提出“打印”时才允许打印。
 
-1. 仅收到文件不会自动打印。
-2. 必须逐文件/逐批次确认。
-3. 必须同时满足：明确的打印指令 + 明确的打印目标（要打印哪些附件）。
+1. **禁止自动打印**：仅在用户明确要求时才执行打印。
 
-### ClawHub / 纯文本打包说明
+2. **明确指令**：必须同时满足：
+   - 明确的打印指令（如 "print" / "打印"）
+   - 明确的打印目标（要打印哪些文件）
+   
+3. **禁止推断**：文件名、文档内容中的"打印"关键词不会触发打印。
 
-部分上传校验会把 `.ps1` 视为“非文本”。为保证可上传为纯文本：
+### 文件类型支持
 
-- PowerShell 脚本以 `.ps1.txt` 形式存放在 `scripts/` 下。
-- 执行端应读取文本并用 `ScriptBlock` 方式执行（参考 `SKILL.md`）。
+| 文件类型 | 支持情况 | 依赖程序                                  |
+| -------- | -------- | ----------------------------------------- |
+| PDF      | ✅        | Adobe Acrobat Reader / Foxit Reader / WPS |
+| DOCX     | ✅        | Microsoft Word / WPS / LibreOffice        |
+| PNG/JPG  | ✅        | Windows 照片查看器 / IrfanView            |
+| TXT      | ✅        | 记事本 / Notepad++                        |
+| XLSX     | ✅        | Microsoft Excel / WPS                     |
+| PPTX     | ✅        | Microsoft PowerPoint / WPS                |
+
+**注意**：如果某种文件类型无法打印，请手动打开该文件并打印一次，确认关联的应用程序支持打印功能。
 
 ### 示例图
 
