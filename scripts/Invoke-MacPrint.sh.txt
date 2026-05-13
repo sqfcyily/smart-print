@@ -1,0 +1,171 @@
+#!/bin/bash
+
+set -e
+
+function log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+function show_usage() {
+  cat <<EOF
+Usage: $(basename "$0") [-p printer] [-n copies] [-w] [-t timeout] <file> [...]
+       $(basename "$0") --list-printers
+
+Options:
+  -p, --printer     Printer name (default: system default printer)
+  -n, --copies      Number of copies (default: 1)
+  -w, --wait        Wait for print process to complete
+  -t, --timeout     Wait timeout in seconds (default: 120)
+  --list-printers   List available printers and exit
+  -h, --help        Show this help message
+
+Examples:
+  $(basename "$0") /path/to/file.pdf
+  $(basename "$0") -p "HP_LaserJet" -n 2 /path/to/file.pdf
+  $(basename "$0") --list-printers
+EOF
+}
+
+function list_printers() {
+  echo "Available printers:"
+  lpstat -p | awk '{print "  " $2}' | sort
+  echo ""
+  echo "Default printer:"
+  lpstat -d | sed 's/no default destination/non-default system/'
+}
+
+function get_default_printer() {
+  lpstat -d 2>/dev/null | awk -F': ' '{print $2}' || echo ""
+}
+
+function resolve_paths() {
+  local input_path="$1"
+
+  if [[ ! -e "$input_path" ]]; then
+    log "Warning: Path does not exist: $input_path"
+    return 1
+  fi
+
+  if [[ -d "$input_path" ]]; then
+    log "Warning: Path is a directory (skipping): $input_path"
+    return 1
+  fi
+
+  realpath "$input_path" 2>/dev/null || echo "$input_path"
+}
+
+function print_file() {
+  local file="$1"
+  local printer="$2"
+  local copies="$3"
+  local wait_flag="$4"
+
+  local resolved_path
+  resolved_path=$(resolve_paths "$file")
+
+  if [[ -z "$resolved_path" ]]; then
+    return 1
+  fi
+
+  local lp_args=("-n" "$copies")
+
+  if [[ -n "$printer" ]]; then
+    lp_args+=("-d" "$printer")
+  fi
+
+  local target_desc="$printer"
+  [[ -z "$target_desc" ]] && target_desc="(default printer)"
+
+  log "Printing: $file -> $target_desc (copy $copy_index of $copies)"
+
+  lp "${lp_args[@]}" "$resolved_path" 2>/dev/null
+
+  if [[ $? -eq 0 ]]; then
+    log "Print job queued successfully: $(basename "$file")"
+  else
+    log "Error: Failed to print $file"
+    return 1
+  fi
+}
+
+PRINTER=""
+COPIES=1
+WAIT=false
+TIMEOUT=120
+LIST_PRINTERS=false
+FILES=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--printer)
+      PRINTER="$2"
+      shift 2
+      ;;
+    -n|--copies)
+      COPIES="$2"
+      shift 2
+      ;;
+    -w|--wait)
+      WAIT=true
+      shift
+      ;;
+    -t|--timeout)
+      TIMEOUT="$2"
+      shift 2
+      ;;
+    --list-printers)
+      LIST_PRINTERS=true
+      shift
+      ;;
+    -h|--help)
+      show_usage
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      show_usage
+      exit 1
+      ;;
+    *)
+      FILES+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "$LIST_PRINTERS" == true ]]; then
+  list_printers
+  exit 0
+fi
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+  echo "Error: No files specified" >&2
+  show_usage
+  exit 1
+fi
+
+if ! command -v lpstat &>/dev/null; then
+  echo "Error: lpstat command not found. Is CUPS installed?" >&2
+  exit 1
+fi
+
+if [[ -n "$PRINTER" ]]; then
+  if ! lpstat -p "$PRINTER" &>/dev/null; then
+    echo "Error: Printer '$PRINTER' not found. Use --list-printers to see available printers." >&2
+    exit 1
+  fi
+fi
+
+FAILED=0
+for file in "${FILES[@]}"; do
+  for ((copy_index=1; copy_index<=COPIES; copy_index++)); do
+    print_file "$file" "$PRINTER" 1 "$WAIT" || ((FAILED++))
+  done
+done
+
+if [[ $FAILED -gt 0 ]]; then
+  echo "Warning: $FAILED file(s) failed to print" >&2
+  exit 1
+fi
+
+exit 0

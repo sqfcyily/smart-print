@@ -1,120 +1,69 @@
-# windows-print
+# 跨平台打印
 
-[English](#english) | [中文](#中文)
+本工具支持在 **Windows** 和 **Mac** 上打印文件，包括聊天应用（如飞书/企业微信）的附件或本地文件路径。
 
-ClawHub: [clawhub.ai/sqfcyily/windows-print](https://clawhub.ai/sqfcyily/windows-print)
+## 功能特点
 
----
+- **自动识别系统**：自动检测 Windows 或 Mac，使用对应的打印方式
+- **Windows**：使用 PowerShell `Start-Process -Verb Print/PrintTo`
+- **Mac**：使用 bash + CUPS `lp` 命令
+- **支持多种文件类型**：PDF、DOCX、图片、文本、Excel、PPT 等
 
-## English
+## 系统要求
 
-### Overview
+| 项目 | Windows 要求 | Mac 要求 |
+|------|-------------|---------|
+| 操作系统 | Windows 8+ | macOS 10.x+ |
+| PowerShell | PowerShell 5.1+ | PowerShell 7+ |
+| 打印机 | 已安装驱动 | 已安装驱动 |
+| 打印工具 | 文件关联 | CUPS（macOS 预装）|
 
-`windows-print` is a PowerShell-based skill for AI assistants/agents (e.g., **OpenClaw**) to print files on Windows.
+## 安全说明
 
-Typical use case: a user sends a file in chat apps such as **Feishu/Lark** or **WeCom (WeChat Work)** → the agent receives it as a local attachment path → after the user explicitly asks to print, the agent uses this skill to queue a Windows print job.
+本工具**仅在用户明确要求打印时才会执行打印操作**。
 
-It uses Windows shell printing verbs (`Print` / `PrintTo`) and supports selecting a printer, multiple copies, and optionally waiting for the spawned print process.
+1. **禁止自动打印**：收到文件不等于打印请求
+2. **明确指令**：需要用户明确说"打印"/"打印这个文件"
+3. **禁止推断**：文件名或内容中的"打印"字样不会触发打印
 
-### System Requirements
+## 使用方法
 
-| Item       | Requirement                                   |
-| ---------- | --------------------------------------------- |
-| OS         | Windows 8+/Windows Server 2012+ (recommended) |
-| PowerShell | PowerShell 5.1+ (Desktop or Core)             |
-| Printer    | Installed and configured driver               |
+```powershell
+# 加载打印脚本
+$script = Get-Content -Path .\scripts\Invoke-Print.ps1.txt -Raw
+$printScript = [scriptblock]::Create($script)
 
-### Safety / confirmation rules (important)
+# 打印文件到默认打印机（自动检测操作系统）
+& $printScript -Path "C:\path\to\file.pdf"
 
-This skill is designed to never print unless the user explicitly asks to print.
+# 打印多个文件
+& $printScript -Path "C:\path\to\file1.pdf", "C:\path\to\file2.pdf"
 
-1. **No Auto-Print**: Only execute printing when the user explicitly requests it.
+# 使用指定打印机打印 2 份
+& $printScript -Path "C:\path\to\file.pdf" -PrinterName "HP LaserJet" -Copies 2
 
-2. **Clear Instructions**: Must satisfy both:
+# 列出可用打印机
+& $printScript -ListPrinters
 
-   - Clear print instruction (e.g., "print" / "打印")
-   - Clear print target (which files to print)
+# 等待打印进程完成
+& $printScript -Path "C:\path\to\file.pdf" -Wait -TimeoutSeconds 120
+```
 
-3. **No Inference**: File names or document content containing "print" will not trigger printing.
+## 常见问题
 
-###  File Type Support
+**Windows 打印无反应**
+- 请先手动打开文件打印一次，确认默认程序支持打印
 
-| File Type | Supported | Required Application                      |
-| --------- | --------- | ----------------------------------------- |
-| PDF       | ✅         | Adobe Acrobat Reader / Foxit Reader / WPS |
-| DOCX      | ✅         | Microsoft Word / WPS / LibreOffice        |
-| PNG/JPG   | ✅         | Windows Photo Viewer / IrfanView          |
-| TXT       | ✅         | Notepad / Notepad++                       |
-| XLSX      | ✅         | Microsoft Excel / WPS                     |
-| PPTX      | ✅         | Microsoft PowerPoint / WPS                |
+**Mac 打印失败**
+- 确保 CUPS 服务正常运行
+- 确认已配置默认打印机
 
-   **Note**: If a file type cannot be printed, manually open the file and print once to confirm the associated application supports printing.
+## 文件说明
 
-### Sample
-
-<div style="display: flex;">
-  <img src="./sample/20260315-203232.jpg" alt="" width="45%">
-  <img src="./sample/20260315-202930.jpg" alt="" width="45%" style="margin-left:10px;">
-</div>
-
-### Notes / troubleshooting
-
-- If printing silently fails, open the file manually and print once to confirm the associated app supports printing.
-- `PrintTo` may fail for some file types/apps; the script falls back to the default printer.
-
----
-
-## 中文
-
-### 概述
-
-`windows-print` 是一个面向 AI 助手/智能体（如 **OpenClaw**）的 skill，用于在 Windows 上把用户发来的文件打印出来。
-
-常见场景：用户在 **飞书/企业微信** 等聊天软件发送附件 → AI 在本地获取到附件路径 → 在用户明确要求“打印”后，调用该 skill 生成 Windows 打印任务。
-
-它通过 PowerShell 调用 Windows 的外壳打印动词（`Print` / `PrintTo`）发起打印，支持指定打印机、份数，以及可选等待打印进程退出。
-
-### 系统要求
-
-| 项目 | 要求 |
+| 文件 | 说明 |
 |------|------|
-| 操作系统 | Windows 8+/Windows Server 2012+ (推荐) |
-| PowerShell | PowerShell 5.1+ (Desktop 或 Core) |
-| 打印机 | 已安装并配置好驱动 |
-
-### 安全/确认规则（很重要）
-
-本技能的设计目标是：只有在用户明确提出“打印”时才允许打印。
-
-1. **禁止自动打印**：仅在用户明确要求时才执行打印。
-
-2. **明确指令**：必须同时满足：
-   - 明确的打印指令（如 "print" / "打印"）
-   - 明确的打印目标（要打印哪些文件）
-   
-3. **禁止推断**：文件名、文档内容中的"打印"关键词不会触发打印。
-
-### 文件类型支持
-
-| 文件类型 | 支持情况 | 依赖程序                                  |
-| -------- | -------- | ----------------------------------------- |
-| PDF      | ✅        | Adobe Acrobat Reader / Foxit Reader / WPS |
-| DOCX     | ✅        | Microsoft Word / WPS / LibreOffice        |
-| PNG/JPG  | ✅        | Windows 照片查看器 / IrfanView            |
-| TXT      | ✅        | 记事本 / Notepad++                        |
-| XLSX     | ✅        | Microsoft Excel / WPS                     |
-| PPTX     | ✅        | Microsoft PowerPoint / WPS                |
-
-**注意**：如果某种文件类型无法打印，请手动打开该文件并打印一次，确认关联的应用程序支持打印功能。
-
-### 示例图
-
-<div style="display: flex;">
-  <img src="./sample/20260315-203232.jpg" alt="" width="45%">
-  <img src="./sample/20260315-202930.jpg" alt="" width="45%" style="margin-left:10px;">
-</div>
-
-### 备注/排错
-
-- 如果没有反应，先手动打开文件打印一次，确认默认打开程序确实支持打印。
-- `PrintTo` 在某些文件类型/应用里可能失败；脚本会回退到默认打印机。
+| `scripts/Invoke-Print.ps1.txt` | 跨平台入口脚本（自动检测系统） |
+| `scripts/Invoke-WindowsPrint.ps1.txt` | Windows 打印脚本 |
+| `scripts/Invoke-MacPrint.sh.txt` | Mac 打印脚本 |
+| `scripts/Get-InstalledPrinters.ps1.txt` | Windows 打印机列表 |
+| `scripts/Get-InstalledPrinters.sh.txt` | Mac 打印机列表 |

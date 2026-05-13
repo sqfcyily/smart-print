@@ -1,0 +1,123 @@
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
+param(
+  [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
+  [Alias('FullName')]
+  [string[]] $Path,
+
+  [Parameter()]
+  [Alias('Printer')]
+  [string] $PrinterName,
+
+  [Parameter()]
+  [ValidateRange(1, 100)]
+  [int] $Copies = 1,
+
+  [Parameter()]
+  [switch] $Wait,
+
+  [Parameter()]
+  [ValidateRange(1, 3600)]
+  [int] $TimeoutSeconds = 120,
+
+  [Parameter()]
+  [switch] $ListPrinters
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$ScriptDir = if ($PSCommandPath) { Split-Path -Parent $PSCommandPath } else { $ScriptDir }
+$ScriptsFolder = Join-Path $ScriptDir 'scripts'
+
+function Get-CurrentPlatform {
+  if ($PSVersionTable.PSEdition -eq 'Desktop' -or $PSVersionTable.Platform -eq 'Win32NT' -or $IsWindows) {
+    return 'Windows'
+  }
+  if ($IsMacOS -or $IsDarwin) {
+    return 'Mac'
+  }
+  if ($IsLinux) {
+    return 'Linux'
+  }
+  return 'Unknown'
+}
+
+function Get-ScriptPath {
+  param([string]$BaseName)
+  $path = Join-Path $ScriptsFolder $BaseName
+  if (Test-Path -LiteralPath $path) {
+    return $path
+  }
+  return $null
+}
+
+$Platform = Get-CurrentPlatform
+
+if ($ListPrinters) {
+  switch ($Platform) {
+    'Windows' {
+      $scriptPath = Get-ScriptPath 'Get-InstalledPrinters.ps1.txt'
+      if ($scriptPath) {
+        & ([scriptblock]::Create((Get-Content -LiteralPath $scriptPath -Raw)))
+      } else {
+        throw "Get-InstalledPrinters.ps1.txt not found"
+      }
+    }
+    'Mac' {
+      $scriptPath = Get-ScriptPath 'Get-InstalledPrinters.sh.txt'
+      if ($scriptPath) {
+        bash $scriptPath
+      } else {
+        throw "Get-InstalledPrinters.sh.txt not found"
+      }
+    }
+    default {
+      throw "Printers listing is not supported on $Platform"
+    }
+  }
+  return
+}
+
+if ($Platform -eq 'Windows') {
+  $scriptPath = Get-ScriptPath 'Invoke-WindowsPrint.ps1.txt'
+  if (-not $scriptPath) {
+    throw "Invoke-WindowsPrint.ps1.txt not found"
+  }
+
+  $sb = [scriptblock]::Create((Get-Content -LiteralPath $scriptPath -Raw))
+  $params = @{ 'Path' = $Path; 'Copies' = $Copies }
+  if ($PrinterName) { $params['PrinterName'] = $PrinterName }
+  if ($Wait) { $params['Wait'] = $true; $params['TimeoutSeconds'] = $TimeoutSeconds }
+
+  & $sb @params
+  return
+}
+
+if ($Platform -eq 'Mac') {
+  $scriptPath = Get-ScriptPath 'Invoke-MacPrint.sh.txt'
+  if (-not $scriptPath) {
+    throw "Invoke-MacPrint.sh.txt not found"
+  }
+
+  $escapedPaths = $Path | ForEach-Object { "'$_'" }
+  $bashCmd = "bash `"$scriptPath`""
+
+  if ($PrinterName) {
+    $bashCmd += " -p `"$PrinterName`""
+  }
+
+  $bashCmd += " -n $Copies"
+
+  if ($Wait) {
+    $bashCmd += " -w -t $TimeoutSeconds"
+  }
+
+  $bashCmd += " $($escapedPaths -join ' ')"
+
+  Write-Verbose "Executing: $bashCmd"
+  Invoke-Expression $bashCmd
+  return
+}
+
+throw "Printing is not supported on platform: $Platform"

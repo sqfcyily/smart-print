@@ -1,0 +1,33 @@
+#!/bin/bash
+
+function get_default_printer() {
+  lpstat -d 2>/dev/null | awk -F': ' '{print $2}' || echo ""
+}
+
+function list_printers() {
+  local default_printer
+  default_printer=$(get_default_printer)
+
+  echo "Installed Printers:"
+  echo "=================="
+
+  lpstat -p | while read -r line; do
+    printer_name=$(echo "$line" | awk '{print $2}')
+
+    if [[ "$printer_name" == "$default_printer" ]]; then
+      echo "  $printer_name (Default)"
+    else
+      echo "  $printer_name"
+    fi
+  done | sort
+
+  echo ""
+  echo "Default Printer: ${default_printer:-<none>}"
+}
+
+if ! command -v lpstat &>/dev/null; then
+  echo "Error: lpstat command not found. Is CUPS installed?" >&2
+  exit 1
+fi
+
+list_printers
