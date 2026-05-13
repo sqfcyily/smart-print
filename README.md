@@ -9,6 +9,13 @@
 - **Mac**：使用 bash + CUPS `lp` 命令
 - **支持多种文件类型**：PDF、DOCX、图片、文本、Excel、PPT 等
 
+## 示例图
+
+<div style="display: flex;">
+  <img src="./sample/20260315-203232.jpg" alt="示例1" width="45%">
+  <img src="./sample/20260315-202930.jpg" alt="示例2" width="45%" style="margin-left:10px;">
+</div>
+
 ## 系统要求
 
 | 项目 | Windows 要求 | Mac 要求 |
